@@ -3,6 +3,7 @@
 pub enum PrimeResult {
     Prime,
     Composite,
+    Unknown,
 }
 
 pub mod trial_division;
