@@ -1,36 +1,28 @@
-
-mod rngs;
+mod rng;
 mod algos;
 mod utils;
 
-use rngs::random_u16;
-use rngs::random_u64;
-
-use algos::trial_division_simple;
-use algos::trial_division;
 use algos::PrimeResult;
 
-use utils::generate_small_primes;
 
-
-fn primes_16bit() {
+fn primes_16bit() -> u16 {
     loop {
-        let num = random_u16().unwrap();
-        if trial_division_simple(num.into()) == PrimeResult::Prime {
-            println!("Prime found: {}", num);
-            break;
+        let num = rng::u16() | 0b1000000000000001;
+        if algos::trial_division_simple(num) == PrimeResult::Prime {
+            return num;
         }
     }
 }
 
 
 
-fn primes_64bit() {
+fn primes_64bit() -> u64 {
     const N: usize = 10000;
-    let primes = generate_small_primes::<N>();
+    let start = (N + 1) as u64;
+    let primes = utils::generate_small_primes::<N>();
 
     loop {
-        let num = random_u64().unwrap() as usize;
+        let num = rng::u64() | 0x8000000000000001u64;
         let mut result = PrimeResult::Unknown;
 
         for i in 0..N {
@@ -41,18 +33,31 @@ fn primes_64bit() {
         }
 
         if result == PrimeResult::Unknown {
-            result = trial_division(num, N + 1)
+            result = algos::trial_division(num, start)
         }
 
         if result == PrimeResult::Prime {
-            println!("Prime found: {}", num);
-            break;
+            return num;
         }
     }
 }
 
 
+
+fn primes_128bit() -> u128 {
+    loop {
+        // let num = rng::u128() | 0x80000000000000000000000000000001u128;
+        let num = (rng::u64() | 0x8000000000000001u64) as u128;
+        if algos::miller_rabin_test(num, 30) == PrimeResult::ProbablePrime {
+            return num;
+        }
+    }
+}
+
+
+
 pub fn run() {
-    // primes_16bit();
-    primes_64bit();
+    // println!("Prime found: {}", primes_16bit());
+    // println!("Prime found: {}", primes_64bit());
+    println!("Prime found: {}", primes_128bit());
 }
