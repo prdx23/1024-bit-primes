@@ -1,8 +1,10 @@
 mod rng;
 mod algos;
 mod utils;
+mod bigint;
 
 use algos::PrimeResult;
+use bigint::BigInt;
 
 
 fn primes_16bit() -> u16 {
@@ -59,5 +61,32 @@ fn primes_128bit() -> u128 {
 pub fn run() {
     // println!("Prime found: {}", primes_16bit());
     // println!("Prime found: {}", primes_64bit());
-    println!("Prime found: {}", primes_128bit());
+    // println!("Prime found: {}", primes_128bit());
+    // primes_128bit()
+
+
+    // println!("{:?}", BigInt::from(1234u128).digits);
+    // println!("{:?}", BigInt::from(random_u128(false).unwrap()).digits);
+
+    // let num = rng::u128() | 0x80000000000000000000000000000001u128;
+    // println!("BigInt: {}", BigInt::from(num));
+    // println!("u128:   {}", num);
+
+    let num1 = rng::u64() as u128;
+    let num2 = rng::u128_range(1, num1) as u128;
+    let expected = num1 - num2;
+    let test = BigInt::from(num1) - BigInt::from(num2);
+
+    // let mut b1 = BigInt::from(num1);
+    // b1 += BigInt::from(num2);
+
+    println!();
+    println!("{} {}", num1, num2);
+    println!("{}", expected);
+    println!("{}", test);
+    // println!("{}", b1);
+
+    // let largest1 = BigInt { digits: [255u8; 78] };
+    // let largest2 = BigInt { digits: [99u8; 78] };
+    // let test = largest1 + largest2;
 }
