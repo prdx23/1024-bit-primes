@@ -73,9 +73,11 @@ pub fn run() {
     // println!("u128:   {}", num);
 
     let num1 = rng::u64() as u128;
-    let num2 = rng::u128_range(1, num1) as u128;
-    let expected = num1 - num2;
-    let test = BigInt::from(num1) - BigInt::from(num2);
+    let num2 = rng::u64() as u128;
+    // let num1 = 123u128;
+    // let num2 = 456u128;
+    let expected = num1 * num2;
+    let test = BigInt::from(num1) * BigInt::from(num2);
 
     // let mut b1 = BigInt::from(num1);
     // b1 += BigInt::from(num2);
