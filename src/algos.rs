@@ -1,9 +1,10 @@
 use crate::rng;
 use crate::utils;
+use crate::BigInt;
 
 
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum PrimeResult {
     Prime,
     Composite,
@@ -40,11 +41,11 @@ pub fn trial_division(n: u64, start: u64) -> PrimeResult {
 
 
 
-pub fn fermat_test(num: u128, k: usize) -> PrimeResult {
+pub fn fermat_test_u128(num: u128, k: usize) -> PrimeResult {
     let mut result = PrimeResult::ProbablePrime;
     for _ in 0..k {
         let base = rng::u128_range(2, num - 1);
-        if utils::mod_exp(base, num - 1, num) != 1 {
+        if utils::mod_exp_u128(base, num - 1, num) != 1 {
             result = PrimeResult::Composite;
             break;
         }
@@ -54,7 +55,7 @@ pub fn fermat_test(num: u128, k: usize) -> PrimeResult {
 
 
 
-pub fn miller_rabin_test(n: u128, k: usize) -> PrimeResult {
+pub fn miller_rabin_test_u128(n: u128, k: usize) -> PrimeResult {
 
     let mut s = 0;
     let mut d = n - 1;
@@ -64,14 +65,49 @@ pub fn miller_rabin_test(n: u128, k: usize) -> PrimeResult {
     }
 
     'main_loop: for _ in 0..k {
-        let base = rng::u128_range(2, n - 2);
+        // let base = rng::u128_range(2, n - 2);
+        let base = 4u128;
 
-        let mut x = utils::mod_exp(base, d, n);
+        let mut x = utils::mod_exp_u128(base, d, n);
         if x == 1 || x == n - 1 { continue 'main_loop; }
 
         for _ in 0..(s - 1) {
-            x = utils::mod_exp(x, 2, n);
+            x = utils::mod_exp_u128(x, 2, n);
             if x == n - 1 { continue 'main_loop; }
+        }
+
+        return PrimeResult::Composite;
+    }
+
+    PrimeResult::ProbablePrime
+}
+
+
+pub fn miller_rabin_test(n: BigInt, k: usize) -> PrimeResult {
+
+    let zero = BigInt::zero();
+    let one = BigInt::from(1);
+    let two = BigInt::from(2);
+
+    let mut s = zero;
+    let mut d = n - one;
+    while d % two == zero {
+        d = d / two;
+        s += one;
+    }
+
+    'main_loop: for _ in 0..k {
+        // let base = rng::u128_range(2, n - 2);
+        let base = BigInt::from(4u128);
+
+        let mut x = utils::mod_exp(base, d, n);
+        if x == one || x == n - one { continue 'main_loop; }
+
+        // for _ in 0..(s - 1) {
+        while s > zero {
+            x = utils::mod_exp(x, two, n);
+            if x == n - one { continue 'main_loop; }
+            s -= one;
         }
 
         return PrimeResult::Composite;

@@ -1,148 +1,93 @@
 use std::fmt;
+use std::cmp::Ordering;
 use std::ops::{
-    Add, Sub, Mul,
-    AddAssign, SubAssign, MulAssign,
+    Add, Sub, Shl, Shr, Mul, Div, Rem,
+    AddAssign, SubAssign, ShlAssign, ShrAssign,
+    MulAssign, DivAssign, RemAssign,
 };
 
-
-use crate::rng;
-
-
-// const B: usize = 4096;
-// const N: usize = 1234;
-
-// const N: usize = 256;
-const N: usize = 78;
+use crate::rng::insert_random_bytes;
 
 
+// const N: usize = 4096;
+const N: usize = 256;
+
+
+#[derive(Copy, Clone)]
 pub struct BigInt {
-    pub digits: [u8; N]
+    pub bits: [bool; N]
 }
 
-
-fn bigint_add(own: &[u8], other: &[u8]) -> [u8; N] {
-    let mut digits = [0u8; N];
-    let mut carry = 0;
-
-    for (i, (d1, d2)) in own.iter().zip(other.iter()).enumerate() {
-        digits[i] = (d1 + d2 + carry) % 10;
-        carry = (d1 + d2 + carry) / 10;
+impl BigInt {
+    pub fn zero() -> Self {
+        Self { bits: [false; N] }
     }
 
-    if carry != 0 { panic!("Attempt to add with overflow"); }
-    digits
-}
+    pub fn random() -> Self {
+        let mut bytes = [0u8; N / 16];
+        insert_random_bytes(&mut bytes).expect("Cannot access /dev/urandom");
 
-
-impl Add for BigInt {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        Self { digits: bigint_add(&self.digits, &other.digits) }
-    }
-}
-
-impl AddAssign for BigInt {
-    fn add_assign(&mut self, other: Self) {
-        self.digits = bigint_add(&self.digits, &other.digits);
-    }
-}
-
-
-
-fn bigint_sub(own: &[u8], other: &[u8]) -> [u8; N] {
-    let mut digits = [0u8; N];
-    let mut borrow = 0;
-
-    for (i, (d1, d2)) in own.iter().zip(other.iter()).enumerate() {
-        if *d1 < *d2 + borrow {
-            digits[i] = 10 + d1 - borrow - d2;
-            borrow = 1;
-        } else {
-            digits[i] = d1 - borrow - d2;
-            borrow = 0;
-        }
-    }
-
-    if borrow != 0 { panic!("Attempt to subtract with overflow"); }
-    digits
-}
-
-impl Sub for BigInt {
-    type Output = Self;
-    fn sub(self, other: Self) -> Self {
-        Self { digits: bigint_sub(&self.digits, &other.digits) }
-    }
-}
-
-impl SubAssign for BigInt {
-    fn sub_assign(&mut self, other: Self) {
-        self.digits = bigint_sub(&self.digits, &other.digits);
-    }
-}
-
-
-
-fn bigint_mul(own: &[u8], other: &[u8]) -> [u8; N] {
-    let mut digits = [0u8; N];
-    let mut carry = 0;
-    let mut position = 0;
-    let mut product;
-    let mut sum;
-
-    for d2 in other {
-        for (i, d1) in own.iter().enumerate() {
-            if (*d1 == 0 || *d2 == 0) && carry == 0 { continue; }
-
-            product = (d1 * d2) + carry;
-
-            if position + i >= digits.len() {
-                if product != 0 {
-                    panic!("Attempt to multiply with overflow");
-                } else {
-                    continue;
-                }
+        let mut bits = [false; N];
+        let mut i = 0;
+        for byte in bytes {
+            for position in 0..8 {
+                let mask = 1 << position;
+                bits[i] = byte & mask > 0;
+                i += 1;
             }
-
-            sum = digits[position + i] + (product % 10);
-            digits[position + i] = sum % 10;
-            carry = (product / 10) + (sum / 10);
         }
 
-        if carry != 0 { panic!("Attempt to multiply with overflow"); }
-        position += 1;
+        Self { bits }
     }
 
-    digits
-}
+    pub fn random_modified() -> Self {
+        let mut bytes = [0u8; N / 16];
+        insert_random_bytes(&mut bytes).expect("Cannot access /dev/urandom");
 
-impl Mul for BigInt {
-    type Output = Self;
-    fn mul(self, other: Self) -> Self {
-        Self { digits: bigint_mul(&self.digits, &other.digits) }
-    }
-}
+        let mut bits = [false; N];
+        let mut i = 0;
+        for byte in bytes {
+            for position in 0..8 {
+                let mask = 1 << position;
+                bits[i] = byte & mask > 0;
+                i += 1;
+            }
+        }
 
-impl MulAssign for BigInt {
-    fn mul_assign(&mut self, other: Self) {
-        self.digits = bigint_mul(&self.digits, &other.digits);
+        bits[0] = true;
+        bits[N - (N / 2) - 1] = true;
+        Self { bits }
     }
 }
 
 
 impl From<u128> for BigInt {
-    fn from(mut n: u128) -> Self {
-        let mut digits = [0; N];
+    fn from(n: u128) -> Self {
+        let mut bits = [false; N];
         let mut i = 0;
 
-        while n > 0 {
-            digits[i] = (n % 10) as u8;
-            n = n / 10;
-            i += 1;
+        for byte in n.to_le_bytes() {
+            for position in 0..8 {
+                let mask = 1 << position;
+                bits[i] = byte & mask > 0;
+                i += 1;
+            }
         }
-        Self { digits }
+
+        Self { bits }
     }
 }
 
+
+impl From<&[bool]> for BigInt {
+    fn from(other: &[bool]) -> Self {
+        let mut bits = [false; N];
+        for (i, bit) in other.iter().enumerate() {
+            bits[i] = *bit;
+        }
+        Self { bits }
+    }
+}
 
 
 impl fmt::Display for BigInt {
@@ -150,10 +95,14 @@ impl fmt::Display for BigInt {
         let mut output = String::new();
         let mut start = false;
 
-        for digit in self.digits.iter().rev() {
-            if !start && *digit == 0 { continue; }
+        for bit in self.bits.iter().rev() {
+            if !start && *bit == false { continue; }
             if !start { start = true; }
-            output.push(char::from_digit(*digit as u32, 10).unwrap());
+
+            output.push(match *bit {
+                true  => '1',
+                false => '0',
+            })
         }
 
         if !start { output.push('0'); }
@@ -162,15 +111,228 @@ impl fmt::Display for BigInt {
 }
 
 
+impl PartialEq for BigInt {
+    fn eq(&self, other: &Self) -> bool {
+        self.bits == other.bits
+    }
+}
+
+impl PartialOrd for BigInt {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+
+        for (b1, b2) in self.bits.iter().zip(other.bits.iter()).rev() {
+            if *b1 && !*b2 { return Some(Ordering::Greater); }
+            else if !*b1 && *b2 { return Some(Ordering::Less); }
+        }
+
+        Some(Ordering::Equal)
+    }
+}
+
+
+fn bigint_add(own: &[bool], other: &[bool]) -> [bool; N] {
+    let mut bits = [false; N];
+    let mut carry = false;
+
+    for (i, (d1, d2)) in own.iter().zip(other.iter()).enumerate() {
+        bits[i] = d1 ^ d2 ^ carry;
+        carry = (d1 & d2) | (carry & (d1 ^ d2));
+    }
+
+    if carry { panic!("Attempt to add with overflow"); }
+    bits
+}
+
+
+impl Add for BigInt {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self { bits: bigint_add(&self.bits, &other.bits) }
+    }
+}
+
+impl AddAssign for BigInt {
+    fn add_assign(&mut self, other: Self) {
+        self.bits = bigint_add(&self.bits, &other.bits);
+    }
+}
+
+
+
+fn bigint_sub(own: &[bool], other: &[bool]) -> [bool; N] {
+    let mut bits = [false; N];
+    let mut borrow = false;
+
+    for (i, (d1, d2)) in own.iter().zip(other.iter()).enumerate() {
+        bits[i] = d1 ^ d2 ^ borrow;
+        borrow = (!d1 & d2) | (borrow & !(d1 ^ d2));
+    }
+
+    if borrow { panic!("Attempt to subtract with overflow"); }
+    bits
+}
+
+impl Sub for BigInt {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self { bits: bigint_sub(&self.bits, &other.bits) }
+    }
+}
+
+impl SubAssign for BigInt {
+    fn sub_assign(&mut self, other: Self) {
+        self.bits = bigint_sub(&self.bits, &other.bits);
+    }
+}
+
+
+
+fn bigint_shl(own: &[bool], amount: usize) -> [bool; N] {
+    let mut bits = [false; N];
+    if amount > N { return bits; }
+    for i in 0..amount { bits[i] = false; }
+    for i in amount..N { bits[i] = own[i - amount]; }
+    bits
+}
+
+
+impl Shl<usize> for BigInt {
+    type Output = Self;
+    fn shl(self, amount: usize) -> Self {
+        Self { bits: bigint_shl(&self.bits, amount) }
+    }
+}
+
+impl ShlAssign<usize> for BigInt {
+    fn shl_assign(&mut self, amount: usize) {
+        self.bits = bigint_shl(&self.bits, amount);
+    }
+}
+
+
+fn bigint_shr(own: &[bool], amount: usize) -> [bool; N] {
+    let mut bits = [false; N];
+    if amount > N { return bits; }
+    for i in 0..(N - amount) { bits[i] = own[i + amount]; }
+    for i in (N - amount)..N { bits[i] = false; }
+    bits
+}
+
+
+impl Shr<usize> for BigInt {
+    type Output = Self;
+    fn shr(self, amount: usize) -> Self {
+        Self { bits: bigint_shr(&self.bits, amount) }
+    }
+}
+
+impl ShrAssign<usize> for BigInt {
+    fn shr_assign(&mut self, amount: usize) {
+        self.bits = bigint_shr(&self.bits, amount);
+    }
+}
+
+
+
+fn bigint_mul(own: &[bool], other: &[bool]) -> [bool; N] {
+    let mut result = BigInt::zero();
+    let n1 = BigInt::from(own);
+    let mut current;
+
+    for (shift, d2) in other.iter().enumerate() {
+        if !(*d2) { continue; }
+
+        for i in (N - shift)..N {
+            if own[i] { panic!("Attempt to multiply with overflow"); }
+        }
+
+        current = n1 << shift;
+        result += current;
+    }
+
+    result.bits
+}
+
+impl Mul for BigInt {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        Self { bits: bigint_mul(&self.bits, &other.bits) }
+    }
+}
+
+impl MulAssign for BigInt {
+    fn mul_assign(&mut self, other: Self) {
+        self.bits = bigint_mul(&self.bits, &other.bits);
+    }
+}
+
+
+
+fn bigint_div(own_bits: &[bool], other_bits: &[bool]) -> ([bool; N], [bool; N]) {
+    let mut quotient = BigInt::zero();
+    let mut dividend = BigInt::from(own_bits);
+    let mut remainder = BigInt::zero();
+    let divisor = BigInt::from(other_bits);
+
+    if divisor == BigInt::zero() {
+        panic!("Attempt to divide by zero");
+    }
+
+    let mut no_of_bits = N;
+    while !dividend.bits[N - 1] {
+        dividend <<= 1;
+        no_of_bits -= 1;
+    }
+
+    for i in 0..no_of_bits {
+        remainder <<= 1;
+        remainder.bits[0] = dividend.bits[N - 1 - i];
+
+        quotient <<= 1;
+        if remainder >= divisor {
+            remainder -= divisor;
+            quotient.bits[0] = true;
+        }
+    }
+
+    (quotient.bits, remainder.bits)
+}
+
+impl Div for BigInt {
+    type Output = Self;
+    fn div(self, other: Self) -> Self {
+        Self { bits: bigint_div(&self.bits, &other.bits).0 }
+    }
+}
+
+impl DivAssign for BigInt {
+    fn div_assign(&mut self, other: Self) {
+        self.bits = bigint_div(&self.bits, &other.bits).0;
+    }
+}
+
+impl Rem for BigInt {
+    type Output = Self;
+    fn rem(self, other: Self) -> Self {
+        Self { bits: bigint_div(&self.bits, &other.bits).1 }
+    }
+}
+
+impl RemAssign for BigInt {
+    fn rem_assign(&mut self, other: Self) {
+        self.bits = bigint_div(&self.bits, &other.bits).1;
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::rng;
     use super::*;
 
     #[test]
     fn from_u128() {
         let num = rng::u128();
-        assert_eq!(format!("{}", num), format!("{}", BigInt::from(num)));
+        assert_eq!(format!("{:b}", num), format!("{}", BigInt::from(num)));
     }
 
     #[test]
@@ -179,7 +341,7 @@ mod tests {
         let num2 = rng::u64() as u128;
         let expected = num1 + num2;
         let test = BigInt::from(num1) + BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", test));
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
     }
 
     #[test]
@@ -189,7 +351,7 @@ mod tests {
         let expected = num1 + num2;
         let mut n = BigInt::from(num1);
         n += BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", n));
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
     }
 
     #[test]
@@ -198,7 +360,7 @@ mod tests {
         let num2 = rng::u128_range(1, num1) as u128;
         let expected = num1 - num2;
         let test = BigInt::from(num1) - BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", test));
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
     }
 
     #[test]
@@ -208,7 +370,45 @@ mod tests {
         let expected = num1 - num2;
         let mut n = BigInt::from(num1);
         n -= BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", n));
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
+    }
+
+    #[test]
+    fn shl() {
+        let num1 = rng::u64() as u128;
+        let amount = 10;
+        let expected = num1 << amount;
+        let test = BigInt::from(num1) << amount;
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
+    }
+
+    #[test]
+    fn shl_assign() {
+        let num1 = rng::u64() as u128;
+        let amount = 10;
+        let expected = num1 << amount;
+        let mut n = BigInt::from(num1);
+        n <<= amount;
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
+    }
+
+    #[test]
+    fn shr() {
+        let num1 = rng::u64() as u128;
+        let amount = 10;
+        let expected = num1 >> amount;
+        let test = BigInt::from(num1) >> amount;
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
+    }
+
+    #[test]
+    fn shr_assign() {
+        let num1 = rng::u64() as u128;
+        let amount = 10;
+        let expected = num1 >> amount;
+        let mut n = BigInt::from(num1);
+        n >>= amount;
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
     }
 
     #[test]
@@ -217,7 +417,7 @@ mod tests {
         let num2 = rng::u64() as u128;
         let expected = num1 * num2;
         let test = BigInt::from(num1) * BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", test));
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
     }
 
     #[test]
@@ -227,14 +427,25 @@ mod tests {
         let expected = num1 * num2;
         let mut n = BigInt::from(num1);
         n *= BigInt::from(num2);
-        assert_eq!(format!("{}", expected), format!("{}", n));
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
     }
 
-    // #[test]
-    // #[should_panic(expected = "Attempt to add with overflow")]
-    // fn add_overflow() {
-    //     let large1 = BigInt { digits: [9u8; N] };
-    //     let large2 = BigInt { digits: [9u8; N] };
-    //     let _ = large1 + large2;
-    // }
+    #[test]
+    fn div() {
+        let num1 = rng::u64() as u128;
+        let num2 = (rng::u64() as u16) as u128;
+        let expected = num1 / num2;
+        let test = BigInt::from(num1) / BigInt::from(num2);
+        assert_eq!(format!("{:b}", expected), format!("{}", test));
+    }
+
+    #[test]
+    fn div_assign() {
+        let num1 = rng::u64() as u128;
+        let num2 = (rng::u64() as u16) as u128;
+        let expected = num1 / num2;
+        let mut n = BigInt::from(num1);
+        n /= BigInt::from(num2);
+        assert_eq!(format!("{:b}", expected), format!("{}", n));
+    }
 }

@@ -4,7 +4,7 @@ use std::fs::File;
 
 
 
-fn insert_random_bytes(mut bytes: &mut[u8]) -> io::Result<()> {
+pub fn insert_random_bytes(mut bytes: &mut[u8]) -> io::Result<()> {
     File::open("/dev/urandom")?.read_exact(&mut bytes)?;
     Ok(())
 }
@@ -42,3 +42,4 @@ pub fn u128_range(min: u128, max: u128) -> u128 {
         if x > min && x < max { return x; }
     }
 }
+
