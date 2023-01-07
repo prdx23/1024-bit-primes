@@ -1,6 +1,6 @@
 use crate::rng;
 use crate::utils;
-// use crate::BigInt;
+use crate::BigInt;
 
 
 
@@ -69,6 +69,53 @@ pub fn miller_rabin_test_u128(n: u128, k: usize) -> PrimeResult {
         for _ in 0..(s - 1) {
             x = utils::mod_exp(x, 2, n);
             if x == n - 1 { continue 'main_loop; }
+        }
+
+        return PrimeResult::Composite;
+    }
+
+    PrimeResult::ProbablePrime
+}
+
+
+pub fn miller_rabin_test(n: BigInt, k: usize) -> PrimeResult {
+
+    let zero = BigInt::zero();
+    let one = BigInt::from(1);
+
+    let mut s = zero;
+    let n_minus_1 = n.decrease();
+
+    let mut d = n_minus_1;
+    while d.is_even() {
+        d >>= 1;
+        s = s.increase();
+    }
+
+    let mut bytes = [0; (1024 / 16)];
+    let mut x;
+    let mut base;
+
+    'main_loop: for _ in 0..k {
+
+        rng::insert_random_bytes(&mut bytes).unwrap();
+        base = BigInt::from(bytes.as_slice());
+
+        x = one;
+        while !d.is_zero() {
+            if !d.is_even() {
+                x = (x * base) % n;
+            }
+            d = d >> 1;
+            base = (base * base) % n;
+        }
+
+        if x == one || x == n_minus_1 { continue 'main_loop; }
+
+        while !s.is_zero() {
+            x = (x * x) % n;
+            if x == n_minus_1 { continue 'main_loop; }
+            s = s.decrease();
         }
 
         return PrimeResult::Composite;

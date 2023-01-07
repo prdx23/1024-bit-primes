@@ -60,9 +60,48 @@ fn primes_128bit() -> u128 {
 }
 
 
+fn primes_1024bit() -> BigInt {
+    const P: usize = 5000;
+    let primes = utils::generate_small_primes::<P>();
+
+    let zero = BigInt::zero();
+    let mut small_prime = BigInt::zero();
+
+    let mut num = BigInt::random();
+    num.modify();
+
+    'prime_loop: loop {
+        num = num.increase_by_2();
+
+        for i in 0..P {
+            small_prime.chunks[0] = primes[i];
+            if num % small_prime == zero {
+                continue 'prime_loop;
+            }
+        }
+
+        if algos::miller_rabin_test(num, 10) == PrimeResult::ProbablePrime {
+            return num;
+        }
+    }
+}
+
 
 pub fn run() {
     // println!("Prime found: {}", primes_16bit());
     // println!("Prime found: {}", primes_64bit());
-    println!("Prime found: {}", primes_128bit());
+    // println!("Prime found: {}", primes_128bit());
+
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    for _ in 0..16 {
+        let thread_tx = tx.clone();
+        std::thread::spawn(move || {
+            thread_tx.send(primes_1024bit()).unwrap();
+        });
+    }
+
+    let prime = rx.recv().unwrap();
+    prime.print_decimal();
+    return
 }
