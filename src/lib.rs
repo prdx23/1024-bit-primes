@@ -46,10 +46,13 @@ fn primes_64bit() -> u64 {
 
 
 
-fn primes_128bit() -> BigInt {
+fn primes_128bit() -> u128 {
     loop {
-        let num = BigInt::random_modified();
-        if algos::miller_rabin_test(num, 1) == PrimeResult::ProbablePrime {
+        let num = (rng::u64() | 0x8000000000000001u64) as u128;
+        // if algos::fermat_test_u128(num, 1) == PrimeResult::ProbablePrime {
+        //     return num;
+        // }
+        if algos::miller_rabin_test_u128(num, 1) == PrimeResult::ProbablePrime {
             return num;
         }
     }
@@ -62,5 +65,4 @@ pub fn run() {
     // println!("Prime found: {}", primes_16bit());
     // println!("Prime found: {}", primes_64bit());
     println!("Prime found: {}", primes_128bit());
-    // primes_128bit();
 }
