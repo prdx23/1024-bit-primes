@@ -27,7 +27,12 @@ pub fn trial_division_simple(n: u16) -> PrimeResult {
 
 
 pub fn trial_division(n: u64, start: u64) -> PrimeResult {
-    // assumption: n > 3 and start > 3
+    // assumption: n is odd, n > 3 and start > 3
+
+    if n % 3 == 0 {
+        return PrimeResult::Composite;
+    }
+
     let root_n = (n as f64).sqrt() as u64;
     for x in (start..(root_n + 1)).step_by(6) {
         if n % x == 0 || n % (x + 2) == 0 {
