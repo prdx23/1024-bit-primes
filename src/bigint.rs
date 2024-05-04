@@ -222,30 +222,50 @@ impl SubAssign for BigInt {
 
 impl BigInt {
 
-    pub fn increase(mut self) -> BigInt {
-        if self.chunks[0] < u64::MAX {
-            self.chunks[0] += 1;
-        } else {
-            self += BigInt::from(1);
+    pub fn add_u64(mut self, inc:u64) -> BigInt {
+        let mut sum;
+        let mut carry = 0;
+        (sum, carry) = self.chunks[0].overflowing_add(inc);
+        self.chunks[0] = sum;
+        let mut i = 1;
+        while carry != 0{
+            (sum, carry) = self.chunks[i].overflowing_add(1);
+            self.chunks[i] = sum;
+            i += 1;
+            if i == N { panic!("Attempt to add with overflow"); }
         }
+
+        self
+    }
+
+    pub fn sub_u64(mut self, inc:u64) -> BigInt {
+        let mut diff;
+        let mut borrow = 0;
+        (diff, borrow) = self.chunks[0].overflowing_sub(dec);
+        self.chunks[0] = diff;
+        let mut i = 1;
+        while borrow != 0{
+            (diff, borrow) = self.chunks[i].overflowing_sub(1);
+            self.chunks[i] = diff;
+            i += 1;
+            if i == N { panic!("Attempt to sub with overflow"); }
+        }
+
+        self
+    }
+
+    pub fn increase(mut self) -> BigInt {
+        self.add_u64(1);
         self
     }
 
     pub fn decrease(mut self) -> BigInt {
-        if self.chunks[0] > 0 {
-            self.chunks[0] -= 1;
-        } else {
-            self -= BigInt::from(1);
-        }
+        self.sub_u64(1);
         self
     }
 
     pub fn increase_by_2(mut self) -> BigInt {
-        if self.chunks[0] < u64::MAX - 1 {
-            self.chunks[0] += 2;
-        } else {
-            self += BigInt::from(2);
-        }
+        self.add_u64(2);
         self
     }
 
